@@ -1,11 +1,10 @@
 # 🌍 GemmaTerrain
-**Multimodal GeoAI for the Unconnected — Gemma 4 on ARM Edge Hardware**
+**Multimodal GeoAI for the Unconnected - Gemma 4 on ARM Edge Hardware**
 
-GemmaTerrain is a fully offline multimodal spatial query system that runs on ARM edge devices (Raspberry Pi 5, Steam Deck). It combines **Gemma 4 E2B/E4B** (quantized GGUF) with high-performance graph routing and spatial databases to answer natural language questions about geographic data — with image and audio input support — without any cloud connectivity.
+GemmaTerrain is a fully offline multimodal spatial query system that runs on ARM edge devices (Raspberry Pi 5, Steam Deck). It combines **Gemma 4 E2B/E4B** (quantized GGUF) with high-performance graph routing and spatial databases to answer natural language questions about geographic data - with image and audio input support - without any cloud connectivity.
 
 Built for humanitarian scenarios where internet access is unreliable: refugee camp navigation, disaster response coordination, and field operations planning.
 
-**Author:** Tasfia Islam Rifa
 
 [![Gemma 4](https://img.shields.io/badge/Gemma%204-E2B%20%2F%20E4B-blue)](https://huggingface.co/google/gemma-4-e4b-it)
 [![LoRA](https://img.shields.io/badge/LoRA-tasfuuu19%2Fgemma--4--e2b--spatial--lora-purple)](https://huggingface.co/tasfuuu19/gemma-4-e2b-spatial-lora)
@@ -35,15 +34,15 @@ Built for humanitarian scenarios where internet access is unreliable: refugee ca
 
 ## 🎯 Key Features
 
-- **100% Offline** — All AI inference runs locally via llama.cpp — no cloud, no API keys
-- **Dual-Model Routing** — Gemma 4 E2B for fast simple lookups, E4B for multimodal and complex queries
-- **Multimodal Input** — Upload a photo of a damaged road and ask "Is this passable?" alongside spatial queries
-- **Natural Language Queries** — Ask in English, Bangla, Spanish, or Indonesian
-- **Real Routing** — Actual walking routes on road network graphs via NetworKit Dijkstra (not straight-line)
-- **Three Disaster Response Scenarios** — Pre-built datasets for Cox's Bazar, San Juan, and Jakarta
-- **Thinking Mode** — Gemma 4 `<think>` blocks visible in the UI for complex reasoning
-- **Battery-Aware** — Routes to E2B automatically when battery < 20%
-- **Fine-Tuned** — Custom LoRA adapter trained on humanitarian spatial query → tool call pairs
+- **100% Offline** - All AI inference runs locally via llama.cpp - no cloud, no API keys
+- **Dual-Model Routing** - Gemma 4 E2B for fast simple lookups, E4B for multimodal and complex queries
+- **Multimodal Input** - Upload a photo of a damaged road and ask "Is this passable?" alongside spatial queries
+- **Natural Language Queries** - Ask in English, Bangla, Spanish, or Indonesian
+- **Real Routing** - Actual walking routes on road network graphs via NetworKit Dijkstra (not straight-line)
+- **Three Disaster Response Scenarios** - Pre-built datasets for Cox's Bazar, San Juan, and Jakarta
+- **Thinking Mode** - Gemma 4 `<think>` blocks visible in the UI for complex reasoning
+- **Battery-Aware** - Routes to E2B automatically when battery < 20%
+- **Fine-Tuned** - Custom LoRA adapter trained on humanitarian spatial query → tool call pairs
 
 ---
 
@@ -186,7 +185,7 @@ cd ../..
 ### 4. Download Models
 ```bash
 mkdir -p models
-# Download from HuggingFace — see INSTALL.md for direct links
+# Download from HuggingFace - see INSTALL.md for direct links
 ```
 
 ### 5. Verify
@@ -202,7 +201,7 @@ ls -la data/
 
 ### Start Model Servers
 
-**Terminal 1 — E2B (simple queries, ~3.5GB)**
+**Terminal 1 - E2B (simple queries, ~3.5GB)**
 ```bash
 ./llama.cpp/build/bin/llama-server \
     -m ./models/google_gemma-4-E2B-it-Q4_K_M.gguf \
@@ -211,7 +210,7 @@ ls -la data/
     --host 0.0.0.0 --port 8080
 ```
 
-**Terminal 2 — E4B (complex/multimodal queries, ~5.4GB)**
+**Terminal 2 - E4B (complex/multimodal queries, ~5.4GB)**
 ```bash
 ./llama.cpp/build/bin/llama-server \
     -m ./models/google_gemma-4-E4B-it-Q4_K_M.gguf \
@@ -385,16 +384,16 @@ python build_location.py "Cox's Bazar, Bangladesh" coxs_bazar
 
 ## 🙏 Acknowledgments
 
-- [Gemma 4](https://huggingface.co/google/gemma-4-e4b-it) by Google DeepMind — Multimodal LLM with native function calling
-- [llama.cpp](https://github.com/ggerganov/llama.cpp) by Georgi Gerganov — Efficient ARM inference engine
-- [Unsloth](https://github.com/unslothai/unsloth) — 2× faster QLoRA fine-tuning
-- [NetworKit](https://networkit.github.io/) — High-performance graph algorithms
-- [DuckDB](https://duckdb.org/) — Embedded analytical database with spatial extension
-- [OSMnx](https://github.com/gboeing/osmnx) by Geoff Boeing — Street network retrieval
-- [OpenStreetMap](https://www.openstreetmap.org/) — Geographic data
+- [Gemma 4](https://huggingface.co/google/gemma-4-e4b-it) by Google DeepMind - Multimodal LLM with native function calling
+- [llama.cpp](https://github.com/ggerganov/llama.cpp) by Georgi Gerganov - Efficient ARM inference engine
+- [Unsloth](https://github.com/unslothai/unsloth) - 2× faster QLoRA fine-tuning
+- [NetworKit](https://networkit.github.io/) - High-performance graph algorithms
+- [DuckDB](https://duckdb.org/) - Embedded analytical database with spatial extension
+- [OSMnx](https://github.com/gboeing/osmnx) by Geoff Boeing - Street network retrieval
+- [OpenStreetMap](https://www.openstreetmap.org/) - Geographic data
 
 ---
 
 ## 📄 License
 
-Apache 2.0 — See [LICENSE](LICENSE) for details.
+Apache 2.0 - See [LICENSE](LICENSE) for details.
