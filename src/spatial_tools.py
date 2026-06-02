@@ -1,7 +1,10 @@
 """
 src/spatial_tools.py
-GemmaTerrain — Spatial Tools
-Repurposed from DreamMeridian with multi-location support.
+GemmaTerrain — Spatial Tools (+ Qdrant damage-aware routing)
+
+Six original OSM/routing tools, plus two Qdrant-backed tools:
+  report_damage     — field workers log damage into Qdrant
+  check_route_damage — query Qdrant for hazards along a proposed route
 """
 
 import networkit as nk
@@ -284,6 +287,72 @@ def geocode_place(place_name: str) -> str:
 
 
 # ============================================================================
+# Qdrant Damage Tools (imported lazily to avoid hard dep if qdrant not installed)
+# ============================================================================
+
+def _damage_store():
+    import damage_store
+    return damage_store
+
+
+def report_damage_tool(
+    text: str,
+    lat: float,
+    lon: float,
+    severity: str = "medium",
+    reporter: str = "",
+) -> str:
+    """Store a field damage report in Qdrant with location context."""
+    return _damage_store().report_damage(
+        text=text, lat=lat, lon=lon,
+        location=current_location or "unknown",
+        severity=severity, reporter=reporter,
+    )
+
+
+def check_route_damage(
+    start_lat: float, start_lon: float,
+    end_lat: float, end_lon: float,
+    buffer_m: int = 150,
+) -> str:
+    """
+    Calculate route then query Qdrant for damage reports near the path.
+    Returns route + damage warnings so the caller can decide to reroute.
+    """
+    # First get the route
+    start_nk = node_mapping.get(_nearest_node(start_lat, start_lon)[0])
+    end_nk = node_mapping.get(_nearest_node(end_lat, end_lon)[0])
+    if start_nk is None or end_nk is None:
+        return json.dumps({"error": "Could not find route nodes"})
+    d = nk.distance.Dijkstra(G_nk, start_nk, True, True, end_nk)
+    d.run()
+    dist = d.distance(end_nk)
+    if dist == float("inf"):
+        return json.dumps({"error": "No route found"})
+
+    path_coords = _path_coords(d.getPath(end_nk))
+
+    # Query Qdrant for damage near this path
+    damage_hits = _damage_store().query_damage_near_route(
+        path_coords, current_location or "unknown", radius_m=buffer_m
+    )
+
+    return json.dumps({
+        "distance_km": round(dist / 1000, 2),
+        "walk_minutes": round(dist / 83.33, 0),
+        "path": path_coords,
+        "damage_warnings": damage_hits,
+        "damage_count": len(damage_hits),
+        "route_safe": len(damage_hits) == 0,
+    })
+
+
+def list_damage_reports_tool() -> str:
+    """List all damage reports for the current location."""
+    return _damage_store().list_damage_reports(current_location or "unknown")
+
+
+# ============================================================================
 # Tool Registry
 # ============================================================================
 TOOLS = {
@@ -293,6 +362,9 @@ TOOLS = {
     "find_along_route": find_along_route,
     "generate_isochrone": generate_isochrone,
     "geocode_place": geocode_place,
+    "report_damage": report_damage_tool,
+    "check_route_damage": check_route_damage,
+    "list_damage_reports": list_damage_reports_tool,
 }
 
 TOOL_DEFINITIONS = [
@@ -370,6 +442,39 @@ TOOL_DEFINITIONS = [
             "properties": {"place_name": {"type": "string"}},
             "required": ["place_name"],
         },
+    },
+    {
+        "name": "report_damage",
+        "description": "Report road or infrastructure damage. Use when a user describes a blocked road, flood, collapse, or hazard. Stores the report in persistent memory so future routes avoid it.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "description": "Description of the damage"},
+                "lat": {"type": "number", "description": "Latitude of the damaged location"},
+                "lon": {"type": "number", "description": "Longitude of the damaged location"},
+                "severity": {"type": "string", "enum": ["low", "medium", "high"], "default": "medium"},
+                "reporter": {"type": "string", "default": ""},
+            },
+            "required": ["text", "lat", "lon"],
+        },
+    },
+    {
+        "name": "check_route_damage",
+        "description": "Calculate a walking route AND check Qdrant for damage reports near the path. Use when user asks to route somewhere safely, or mentions avoiding flooded/damaged/blocked roads.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "start_lat": {"type": "number"}, "start_lon": {"type": "number"},
+                "end_lat": {"type": "number"}, "end_lon": {"type": "number"},
+                "buffer_m": {"type": "integer", "default": 150},
+            },
+            "required": ["start_lat", "start_lon", "end_lat", "end_lon"],
+        },
+    },
+    {
+        "name": "list_damage_reports",
+        "description": "List all active damage reports for the current area.",
+        "parameters": {"type": "object", "properties": {}},
     },
 ]
 

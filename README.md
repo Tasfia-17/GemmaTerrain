@@ -37,6 +37,7 @@ Built for humanitarian scenarios where internet access is unreliable: refugee ca
 - **100% Offline** - All AI inference runs locally via llama.cpp - no cloud, no API keys
 - **Dual-Model Routing** - Gemma 4 E2B for fast simple lookups, E4B for multimodal and complex queries
 - **Multimodal Input** - Upload a photo of a damaged road and ask "Is this passable?" alongside spatial queries
+- **Live Damage Memory (Qdrant)** - Field workers report hazards; Qdrant stores them as embeddings with geo-payload filtering for damage-aware routing
 - **Natural Language Queries** - Ask in English, Bangla, Spanish, or Indonesian
 - **Real Routing** - Actual walking routes on road network graphs via NetworKit Dijkstra (not straight-line)
 - **Three Disaster Response Scenarios** - Pre-built datasets for Cox's Bazar, San Juan, and Jakarta
@@ -74,18 +75,19 @@ User Query (text / image / audio)
         │
         ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  Spatial Tools (6 functions)                                │
+│  Spatial Tools (9 functions)                                │
 │  list_pois │ find_nearest_poi_with_route │ calculate_route  │
 │  find_along_route │ generate_isochrone │ geocode_place      │
+│  report_damage │ check_route_damage │ list_damage_reports   │
 └─────────────────────────────────────────────────────────────┘
         │
-        ┌──────────────┴──────────────┐
-        ▼                             ▼
-┌──────────────────┐    ┌──────────────────────────────────┐
-│  DuckDB Spatial  │    │  NetworKit Graph Engine          │
-│  POI queries     │    │  Dijkstra routing on OSM network │
-│  R-tree indexed  │    │  ~25K–208K nodes per city        │
-└──────────────────┘    └──────────────────────────────────┘
+        ┌──────────────┴──────────────┬──────────────────────┐
+        ▼                             ▼                      ▼
+┌──────────────────┐    ┌──────────────────────────────────┐ ┌─────────────────┐
+│  DuckDB Spatial  │    │  NetworKit Graph Engine          │ │  Qdrant Vector  │
+│  POI queries     │    │  Dijkstra routing on OSM network │ │  Damage memory  │
+│  R-tree indexed  │    │  ~25K–208K nodes per city        │ │  ~384-dim embed │
+└──────────────────┘    └──────────────────────────────────┘ └─────────────────┘
 ```
 
 ---
@@ -297,8 +299,59 @@ python gemmaterrain.py -l jakarta "Apotek dalam radius 1km dari Gelora"
 | `find_along_route` | POIs along a walking path | "Pharmacies along route from A to B" |
 | `generate_isochrone` | Walkable area from a point in N minutes | "15 minute walking radius from Camp 6" |
 | `geocode_place` | Place name → coordinates | "Where is Camp 8W?" |
+| `report_damage` | Log infrastructure damage to Qdrant | "Road near Camp 6 is flooded" |
+| `check_route_damage` | Route + damage warnings from Qdrant | "Safe route from Camp 3 to Camp 8W?" |
+| `list_damage_reports` | Show active damage reports | "Show all damage in this area" |
 
 **Supported POI types:** `hospital`, `clinic`, `doctors`, `pharmacy`, `police`, `fire_station`, `shelter`, `school`, `university`, `bank`, `atm`, `supermarket`, `marketplace`, `drinking_water`, `water_point`, `fuel`, `bus_station`, `place_of_worship`
+
+---
+
+## 🚧 Qdrant Damage Memory System
+
+GemmaTerrain uses Qdrant to store field-reported infrastructure damage as semantic embeddings. This allows the system to automatically avoid damaged routes without retraining.
+
+### How it works
+
+1. **Field worker reports damage** via natural language or the Streamlit UI:
+   ```bash
+   python gemmaterrain.py -l coxs_bazar "Report: Road near Camp 6 is flooded and impassable"
+   ```
+
+2. **Text is embedded** using `sentence-transformers/all-MiniLM-L6-v2` (80MB, runs on Pi 5)
+
+3. **Stored in Qdrant** with geo-payload (lat/lon, severity, timestamp)
+
+4. **Future route queries** automatically check Qdrant for damage within 150m of the path
+
+5. **Damage warnings** are returned with the route, triggering reroute suggestions
+
+### Demo the system
+
+```bash
+# Install dependencies (includes qdrant-client + sentence-transformers)
+uv sync
+
+# Populate demo damage data
+python demo_damage_data.py
+
+# Query with damage awareness
+python gemmaterrain.py -l coxs_bazar "Safe route from Camp 3 to Camp 8W"
+python gemmaterrain.py -l san_juan "Check route from Condado to Miramar for hazards"
+```
+
+### Streamlit UI
+
+The Streamlit dashboard includes a damage report panel where field workers can:
+- Submit damage reports with severity levels (low/medium/high)
+- View all active reports for the current location
+- Delete outdated reports
+
+```bash
+uv run streamlit run app.py --server.port 8501
+```
+
+Open the "🚧 Report Field Damage" expander at the bottom of the page.
 
 ---
 

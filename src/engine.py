@@ -184,6 +184,7 @@ def query(
 
 def health_check() -> dict:
     locations = list_locations()
+    from damage_store import get_collection_stats
     return {
         "e2b_server": gemma_client.health_check(Model.E2B),
         "e4b_server": gemma_client.health_check(Model.E4B),
@@ -193,4 +194,5 @@ def health_check() -> dict:
         "locations": list(locations.keys()),
         "current_location": spatial_tools.current_location,
         "spatial_loaded": spatial_tools.G_nk is not None,
+        "qdrant": get_collection_stats(),
     }

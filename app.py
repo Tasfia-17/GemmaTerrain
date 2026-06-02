@@ -366,10 +366,30 @@ def main():
                 st.metric("Route", f"{data['distance_km']:.1f} km · {int(data['walk_minutes'])} min")
             if "reachable_nodes" in data:
                 st.metric(f"Reachable ({data['max_minutes']}m)", f"{data['reachable_nodes']:,}")
+            if result.tool_name == "check_route_damage":
+                dmg = data.get("damage_count", 0)
+                safe = data.get("route_safe", True)
+                if safe:
+                    st.success("✅ Route is clear")
+                else:
+                    st.error(f"⚠️ {dmg} damage report(s) on this route")
+                    for w in data.get("damage_warnings", [])[:3]:
+                        st.markdown(f"- **{w['severity'].upper()}** {w['text']} ({w['distance_m']:.0f}m off-route)")
 
             if result.llm_stats and result.llm_stats.tokens_per_sec > 0:
                 s = result.llm_stats
                 st.caption(f"⚡ {s.tokens_per_sec:.1f} tok/s · {s.prompt_tokens}+{s.completion_tokens} tokens")
+
+            # Show damage warnings if present
+            if result.tool_name == "check_route_damage":
+                dmg = data.get("damage_count", 0)
+                safe = data.get("route_safe", True)
+                if safe:
+                    st.success("✅ Route is clear")
+                else:
+                    st.error(f"⚠️ {dmg} damage report(s) near route")
+                    for w in data.get("damage_warnings", [])[:3]:
+                        st.markdown(f"- **{w['severity'].upper()}** {w['text']} ({w['distance_m']:.0f}m off)")
 
         with col3:
             # Thinking block
@@ -388,6 +408,46 @@ def main():
 
             if st.checkbox("Show JSON"):
                 st.json(result.result)
+
+    # ── Damage Report Panel ──────────────────────────────────────────────────
+    st.divider()
+    with st.expander("🚧 Report Field Damage (Qdrant Memory)", expanded=False):
+        st.caption("Submit infrastructure damage reports. They are embedded and stored in Qdrant so future route queries automatically avoid them.")
+        sys.path.insert(0, str(Path(__file__).parent / "src"))
+        from damage_store import report_damage, list_damage_reports, delete_damage_report, get_collection_stats
+
+        stats = get_collection_stats()
+        qdrant_pts = stats.get("points", 0)
+        st.markdown(f"**Qdrant collection:** `damage_reports` · {qdrant_pts} reports stored")
+
+        dc1, dc2, dc3 = st.columns(3)
+        with dc1:
+            dmg_text = st.text_area("Damage description", placeholder="e.g. Road flooded after heavy rain, impassable", height=80, key="dmg_text")
+        with dc2:
+            dmg_lat = st.number_input("Latitude", value=float(loc["center"][0]), format="%.6f", key="dmg_lat")
+            dmg_lon = st.number_input("Longitude", value=float(loc["center"][1]), format="%.6f", key="dmg_lon")
+        with dc3:
+            dmg_sev = st.selectbox("Severity", ["low", "medium", "high"], index=1, key="dmg_sev")
+            dmg_rep = st.text_input("Reporter (optional)", key="dmg_rep")
+
+        if st.button("Submit Damage Report", key="dmg_submit", disabled=not dmg_text):
+            res = json.loads(report_damage(dmg_text, dmg_lat, dmg_lon, selected, dmg_sev, dmg_rep))
+            st.success(f"✅ Stored in Qdrant (ID: `{res['id'][:8]}...`)")
+            st.rerun()
+
+        # List existing reports
+        reports_json = json.loads(list_damage_reports(selected))
+        if reports_json["count"] > 0:
+            st.markdown(f"**Active reports for {loc['name'].split(',')[0]}:** {reports_json['count']}")
+            for r in reports_json["reports"][:10]:
+                rcol1, rcol2 = st.columns([5, 1])
+                with rcol1:
+                    sev_color = {"low": "🟡", "medium": "🟠", "high": "🔴"}.get(r.get("severity","medium"), "⚪")
+                    st.markdown(f"{sev_color} **{r.get('severity','?').upper()}** — {r['text']} _(lat {r['lat']:.4f}, lon {r['lon']:.4f})_")
+                with rcol2:
+                    if st.button("🗑️", key=f"del_{r['id']}"):
+                        delete_damage_report(r["id"])
+                        st.rerun()
 
 
 if __name__ == "__main__":
